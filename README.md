@@ -30,7 +30,7 @@ As a user, I want to be able to take notes for future tasks. I want my notes to 
 
 ---
 
-![Demo](public/assets/demo/note%20taker%20recording.gif)
+![Demo](public/assets/demo/note%20take%20a.gif)
 
 ## Contact
 
