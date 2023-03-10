@@ -1,61 +1,59 @@
 const express = require('express');
 const path = require('path');
-const fs = require('fa');
-const uuid = require('uuid');
-
+const { v4: uuidv4 } = require('uuid');
+const fs = require('fs');
+const util = require('util');
+const readFile = util.promisify(fs.readFile);
+const writeFile = util.promisify(fs.writeFile);
 
 const PORT = process.env.PORT || 3001;
-
 const app = express();
 
-// Use middlware for parsing JSON and urlencoded data
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static('public'));
+//Read db and parse it using json
+const fetchNotes = () => {
+  return readFile('db/db.json', 'utf-8')
+  .then(rawNotes => [].concat(JSON.parse(rawNotes)))
+}
 
-app.get('/api/notes', (req, res) =>
-    res.sendFile(path.join(__dirname, './db/db.json'))
+//Middleware
+app.use(express.static('public'));
+app.use(express.urlencoded({extended:false}));
+app.use(express.json());
+
+//GET Routes
+app.get('/', (req, res) =>
+  res.sendFile(path.join(__dirname, '/public/index.html'))
 );
 
-app.post('/api/notes', (req, res) => {
-const note = JSON.parse(fs.readFileSync('.db/db.json'));
-    const {title, text} = req.body;
+app.get('/notes', (req, res) =>
+  res.sendFile(path.join(__dirname, '/public/notes.html'))
+);
 
-    if (title && text) {
-        const newNote = {
-            title,
-            text,
-            id: uuid(),
-        };
-        note.push(newNote);
 
-        const response = {
-            status: 'success',
-            bosy: newNote,
-        };
-        res.status(207).json(response);
-    } else {
-        res.status(500).json('Cannot Post Note');
-    }
-    fs.writeFileSync('.db/db.json', JSON.stringify(note), "utf-8");
-    res.json(note);
-});
-
-// to delete note
-app.delete('/api/notes/:id', (req, res) => {
-    const deleteNote = note.filter((delNote) => delNote.id !== req.params.id);
-    fs.writeFileSync('.db/db.json', JSON.stringify(deleteNote));
-    res.json(deleteNote);
-});
-
-// routing
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, '/public/index.html'));
-});
-
-app.get('/notes', (req, res) => {
-    res.sendFile(path.join(__dirname, '/public/notes.html'));
+//Routing
+app.get('/api/notes', (req, res) => {
+    fetchNotes().then(notes => res.json(notes))
+    .catch(err => res.status(500).json(err))
+    });
+    
+app.post('/api/notes', ({body}, res) => {
+    fetchNotes()
+    .then(savedNotes => {
+    const newNotes = [...savedNotes, {title: body.title, text: body.text, id: uuidv4()}]
+    writeFile('db/db.json', JSON.stringify(newNotes)).then(() => res.json({msg: 'ok'}))
+    .catch(err => res.status(500).json(err))
+    })
 })
+//Bonus
+app.delete('/api/notes/:id', (req, res) => {
+    fetchNotes().then(savedNotes => {
+      let newNotes = savedNotes
+      .filter(note => note.id !== req.params.id)
+      writeFile('db/db.json', JSON.stringify(newNotes))
+      .then(() => res.json({msg: 'ok'}))
+      .catch(err => res.status(500).json(err))
+    })
+  })
 
 app.listen(PORT, () => {
     console.log('Now Listening')
